@@ -1,0 +1,5 @@
+Credits
+-------
+
+Development of this package was sponsored by `Liberiun Technologies
+<http://www.liberiun.com/>`_.

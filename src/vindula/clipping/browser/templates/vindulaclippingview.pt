@@ -1,0 +1,22 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"
+      xmlns:tal="http://xml.zope.org/namespaces/tal"
+      xmlns:metal="http://xml.zope.org/namespaces/metal"
+      lang="en"
+      metal:use-macro="context/main_template/macros/master">
+
+<body>
+<metal:main metal:fill-slot="main">
+    <div class="content-core">
+    <tal:feeds repeat="feed view/get_feeds">
+    <fieldset>
+        <legend>teste</legend>
+        <tal:feed repeat="item python:view.get_feed(feed)">
+            <h6 tal:content="item/title"></h6>
+            <p tal:content="item/summary" />
+        </tal:feed>
+    </fieldset>
+    </tal:feeds>
+    </div>
+</metal:main>
+</body>
+</html>
