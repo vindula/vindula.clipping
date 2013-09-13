@@ -1,4 +1,0 @@
-vindula.clipping
-================
-
-Vindula Clipping
