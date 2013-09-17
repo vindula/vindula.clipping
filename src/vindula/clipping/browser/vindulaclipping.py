@@ -15,7 +15,7 @@ grok.templatedir("templates")
 
 class VindulaClippingView(grok.View):
     grok.name('view')
-    grok.permissions("Zope2.View")
+    grok.require("zope2.View")
     grok.context(IVindulaClipping)
 
     def update(self):
