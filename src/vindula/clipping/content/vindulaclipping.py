@@ -4,6 +4,7 @@ from zope.interface import implements
 
 from Products.Archetypes import atapi
 from Products.ATContentTypes.content import schemata
+from Products.CMFCore.utils import getToolByName
 
 from plone.app.folder.folder import ATFolder, ATFolderSchema
 

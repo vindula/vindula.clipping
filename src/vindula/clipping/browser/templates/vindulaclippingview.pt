@@ -5,18 +5,30 @@
       metal:use-macro="context/main_template/macros/master">
 
 <body>
-<metal:main metal:fill-slot="main">
-    <div class="content-core">
-    <tal:feeds repeat="feed view/get_feeds">
-    <fieldset>
-        <legend>teste</legend>
-        <tal:feed repeat="item python:view.get_feed(feed)">
-            <h6 tal:content="item/title"></h6>
-            <p tal:content="item/summary" />
-        </tal:feed>
-    </fieldset>
-    </tal:feeds>
-    </div>
+<metal:main fill-slot="content-core">
+    <form action="" method="post">
+        <tal:feeds repeat="feed view/get_feeds">
+        <fieldset>
+            <legend tal:content="python: view.get_font_title(feed)"></legend>
+            <table border="0" style="border: medium none;">
+            <tal:feed repeat="item python:view.get_feed(feed)">
+                <tr>
+                    <td>
+                        <h6 tal:content="item/title"></h6>
+                        <p tal:condition="item/summary|nothing"
+                           tal:content="item/summary" />
+                    </td>
+                    <td>
+                        <input type="checkbox" name="title" value="" tal:attributes="value item/title"/>
+                    </td>
+                </tr>
+            </tal:feed>
+            </table>
+        </fieldset>
+        <br />
+        </tal:feeds>
+    <input type="submit" name="submit.clipping" value="Importar" />
+    </form>
 </metal:main>
 </body>
 </html>

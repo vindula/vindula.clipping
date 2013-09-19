@@ -43,7 +43,8 @@ setup(name='vindula.clipping',
       zip_safe=False,
       install_requires=[
           'setuptools',
-          # -*- Extra requirements: -*-
+          'FeedParser',
+          'BeautifulSoup',
       ],
       extras_require={'test': ['plone.app.testing[robot]>=4.2.2']},
       entry_points="""
