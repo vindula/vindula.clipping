@@ -63,13 +63,6 @@ def update_text(obj, text, mimetype=None):
 
 def get_uid_from_entry(entry):
     """Get a unique id from the entry.
-
-    We return an md5 digest.  Usually that should be from the id of
-    the entry, but sometimes, rss providers send items without guid
-    element; we take the link then.  If even that is missing, then we
-    cannot get a unique id so we cannot know if this is a new item
-    that should be added or an existing that should be updated.  So we
-    return nothing for safety.
     """
     if hasattr(entry, 'id'):
         value = entry.id
@@ -80,8 +73,10 @@ def get_uid_from_entry(entry):
     sig = md5(value.encode('ascii', 'ignore'))
     return sig.hexdigest()
 
+
+
 class VindulaClippingView(grok.View):
-    grok.name('view')
+    grok.name('importar-rss')
     grok.require("zope2.View")
     grok.context(IVindulaClipping)
 
@@ -90,11 +85,12 @@ class VindulaClippingView(grok.View):
         self.portal = getToolByName(self.context, "portal_url").getPortalObject()
         self.pw = getToolByName(self.context, 'portal_workflow')
         self.portal_transforms = getToolByName(self.context, 'portal_transforms')
+
         titles = self.request.form.get('title', None)
         submitted = self.request.form.get('submit.clipping', None)
+
         if titles and submitted:
             self.import_feed_items(titles)
-
 
     def get_feeds(self):
         return self.context.feeds
@@ -316,16 +312,12 @@ class VindulaClippingView(grok.View):
                             continue
                         enclosure = obj.addEnclosure(enclosureId)
                         enclosure.update(title=enclosureId)
-                        updateWithRemoteFile(enclosure, link)
                         if enclosure.Title() != enclosure.getId():
                             self.tryRenamingEnclosure(enclosure, obj)
                             # At this moment in time, the
                         # rename-after-creation magic might have changed
                         # the ID of the file. So we recatalog the object.
                         obj.reindexObject()
-
-
-
 
     def tryRenamingEnclosure(self, enclosure, feeditem):
         newId = enclosure.Title()
@@ -339,22 +331,6 @@ class VindulaClippingView(grok.View):
                     pass
             newId = '%i_%s' % (x, enclosure.Title())
 
-    def _retrieveSingleFeed(self, url):
-
-
-
-
-
-
-            # Tags cannot be handled by the update method AFAIK,
-            # because it is not an Archetypes field.
-
-            if obj is not None:
-                try:
-                    event.notify(FeedItemConsumedEvent(obj))
-                except UnicodeDecodeError:
-                    logger.warn("UnicodeDecodeError: %s" %
-                                '/'.join(obj.getPhysicalPath()))
 
     def isHTMLEnclosure(self, enclosure):
         if hasattr(enclosure, 'type'):
