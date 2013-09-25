@@ -29,18 +29,6 @@ from HTMLParser import HTMLParseError
 
 grok.templatedir("templates")
 
-meses = {'1':'Jan',
-         '2':'Fev',
-         '3':'Mar',
-         '4':'Abr',
-         '5':'Mai',
-         '6':'Jun',
-         '7':'Jul',
-         '8':'Ago',
-         '9':'Set',
-         '10':'Out',
-         '11':'Nov',
-         '12':'Dez'}
 
 def convert_summary(input):
     try:
@@ -123,7 +111,7 @@ class VindulaClippingView(grok.View):
     def folder_day(self):
         publica = self.pw.doActionFor
         ano = str(DateTime().year())
-        mes = meses[str(DateTime().month())]
+        mes = str(DateTime().month())
         dia = str(DateTime().day())
         folder = self.context
 
@@ -180,9 +168,14 @@ class VindulaClippingView(grok.View):
         folder = self.folder_day()
         for url in urls:
             for entry in self.get_feed(url):
-                entries.append(entry)
+                entry_dic = {}
+                entry_dic['font'] = self.get_font_title(url)
+                entry_dic['entry'] = entry
+                entries.append(entry_dic)
 
-        for entry in entries:
+        for feed in entries:
+            font = feed['font']
+            entry = feed['entry']
             if entry['title'] in titles:
                 id = get_uid_from_entry(entry)
                 if not id:
@@ -196,8 +189,9 @@ class VindulaClippingView(grok.View):
                     updated = published
                 folder.invokeFactory('VindulaNews', id=id, title=entry['title'])
                 obj = getattr(folder, id)
+                obj.setCreators(font,)
                 self.pw.doActionFor(obj,'publish_internally')
-
+               
                 linkDict = getattr(entry, 'link', None)
                 if linkDict:
                     # Hey, that's not a dict at all; at least not in my test.
