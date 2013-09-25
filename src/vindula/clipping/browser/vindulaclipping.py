@@ -97,9 +97,12 @@ class VindulaClippingView(grok.View):
 
     def get_font_title(self, url):
         feed = feedparser.parse(url)
-        title = feed.feed['title']
-        if title:
-            return title
+        try:
+            title = feed.feed['title']
+        except KeyError:
+            title = 'Feed desconhecido'
+
+        return title
 
     def cleanFeed(self, feed):
         """Sanitize the feed.

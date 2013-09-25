@@ -9,12 +9,17 @@
     <form action="" method="post">
         <tal:feeds repeat="feed view/get_feeds">
         <fieldset>
-            <legend tal:content="python: view.get_font_title(feed)"></legend>
+            <legend><h2 tal:content="python: view.get_font_title(feed)"></h2></legend>
             <table border="0" style="border: medium none;">
             <tal:feed repeat="item python:view.get_feed(feed)">
                 <tr>
                     <td>
-                        <h6 tal:content="item/title"></h6>
+                        <h6>
+                            <a href=""
+                               target="_blank"
+                               tal:attributes="href item/link"
+                               tal:content="item/title"></a>
+                        </h6>
                         <p tal:condition="item/summary|nothing"
                            tal:content="item/summary" />
                     </td>
