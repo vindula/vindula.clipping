@@ -22,6 +22,8 @@ from five import grok
 
 from Products.CMFCore.utils import getToolByName
 
+from Products.statusmessages.interfaces import IStatusMessage
+
 from vindula.clipping.interfaces import IVindulaClipping
 
 from BeautifulSoup import BeautifulSoup
@@ -315,6 +317,7 @@ class VindulaClippingView(grok.View):
                         # rename-after-creation magic might have changed
                         # the ID of the file. So we recatalog the object.
                         obj.reindexObject()
+        IStatusMessage(self.request).addStatusMessage('Importacao concluida com sucesso', type='info')
 
     def tryRenamingEnclosure(self, enclosure, feeditem):
         newId = enclosure.Title()

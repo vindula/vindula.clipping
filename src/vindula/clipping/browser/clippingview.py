@@ -51,7 +51,7 @@ class ClippingView(grok.View):
             D['path'] = {'query':'/'.join(self.context.getPhysicalPath())}
             result = catalog_tool(**D)
         else:
-            result = catalog_tool({'portal_type': ('ATNewsItem','VindulaNews',), 'sort_on': 'effective', 'sort_order':'reverse'})
+            result = catalog_tool({'portal_type': ('ATNewsItem','VindulaNews',), 'sort_on': 'effective', 'sort_order':'reverse'}, path={'query':'/'.join(self.context.getPhysicalPath())})
         return result
 
     def getCookies(self, cookies=None):
