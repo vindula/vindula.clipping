@@ -9,6 +9,8 @@ import re
 import tempfile
 import urllib2
 
+from Products.CMFCore.WorkflowCore import WorkflowException
+
 from Products.ATContentTypes.lib import constraintypes
 from zExceptions import BadRequest
 
@@ -124,7 +126,10 @@ class VindulaClippingView(grok.View):
                 folder.setConstrainTypesMode(constraintypes.ENABLED)
                 folder.setLocallyAllowedTypes(['VindulaFolder'])
                 folder.setImmediatelyAddableTypes(['VindulaFolder'])
-                publica(folder,'publish_internally')
+                try:
+                    publica(folder,'publish_internally')
+                except WorkflowException:
+                    publica(folder, 'publish')
             except BadRequest:
                 return False
                 pass
@@ -139,7 +144,10 @@ class VindulaClippingView(grok.View):
                 folder.setConstrainTypesMode(constraintypes.ENABLED)
                 folder.setLocallyAllowedTypes(['VindulaFolder'])
                 folder.setImmediatelyAddableTypes(['VindulaFolder'])
-                publica(folder,'publish_internally')
+                try:
+                    publica(folder,'publish_internally')
+                except WorkflowException:
+                    publica(folder, 'publish')
             except BadRequest:
                 return False
                 pass
@@ -154,7 +162,10 @@ class VindulaClippingView(grok.View):
                 folder.setConstrainTypesMode(constraintypes.ENABLED)
                 folder.setLocallyAllowedTypes(['VindulaNews'])
                 folder.setImmediatelyAddableTypes(['VindulaNews'])
-                publica(folder,'publish_internally')
+                try:
+                    publica(folder,'publish_internally')
+                except WorkflowException:
+                    publica(folder, 'publish')
             except BadRequest:
                 return False
                 pass
@@ -192,7 +203,11 @@ class VindulaClippingView(grok.View):
                 folder.invokeFactory('VindulaNews', id=id, title=entry['title'])
                 obj = getattr(folder, id)
                 obj.setCreators(font,)
-                self.pw.doActionFor(obj,'publish_internally')
+                try:
+                    self.pw.doActionFor(obj,'publish_internally')
+                except WorkflowException:
+                    self.pw.doActionFor(obj,'publish')
+
                
                 linkDict = getattr(entry, 'link', None)
                 if linkDict:
