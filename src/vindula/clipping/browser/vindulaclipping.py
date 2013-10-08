@@ -66,7 +66,6 @@ def get_uid_from_entry(entry):
     return sig.hexdigest()
 
 
-
 class VindulaClippingView(grok.View):
     grok.name('importar-rss')
     grok.require("zope2.View")
@@ -200,7 +199,10 @@ class VindulaClippingView(grok.View):
                     # property may be blank if item has never
                     # been updated -- use published date
                     updated = published
-                folder.invokeFactory('VindulaNews', id=id, title=entry['title'])
+                try:
+                    folder.invokeFactory('VindulaNews', id=id, title=entry['title'])
+                except BadRequest:
+                    IStatusMessage(self.request).addStatusMessage('A notícia %s já foi importada anteriormente' % entry['title'], type='error')
                 obj = getattr(folder, id)
                 obj.setCreators(font,)
                 try:
