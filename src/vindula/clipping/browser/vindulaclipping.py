@@ -86,7 +86,6 @@ class VindulaClippingView(grok.View):
         if titles and submitted:
             self.import_feed_items(titles)
 
-    @ram.cache(lambda *args: time() // (60 * 60))
     def get_feeds(self):
         return self.context.feeds
 
