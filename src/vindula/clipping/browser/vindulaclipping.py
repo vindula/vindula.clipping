@@ -107,8 +107,7 @@ class VindulaClippingView(grok.View):
                 entry["published_parsed"]=entry["updated_parsed"]
                 entry["published"]=entry["updated"]
 
-    @request.cache(get_key=lambda func,self:self.get_feeds,
-                   get_request="self.request")
+    @request.cache(get_key=lambda func,self:self.get_feeds)
     def get_feed(self, url):
         """ Pega um feed.
         """
