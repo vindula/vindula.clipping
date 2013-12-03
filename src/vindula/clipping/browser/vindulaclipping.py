@@ -8,6 +8,9 @@ import os
 import re
 import tempfile
 import urllib2
+from time import time
+
+from plone.memoize import ram
 
 from Products.CMFCore.WorkflowCore import WorkflowException
 
@@ -83,6 +86,7 @@ class VindulaClippingView(grok.View):
         if titles and submitted:
             self.import_feed_items(titles)
 
+    @ram.cache(lambda *args: time() // (60 * 60))
     def get_feeds(self):
         return self.context.feeds
 
@@ -104,6 +108,7 @@ class VindulaClippingView(grok.View):
                 entry["published_parsed"]=entry["updated_parsed"]
                 entry["published"]=entry["updated"]
 
+    @ram.cache(lambda *args: time() // (60 * 60))
     def get_feed(self, url):
         """ Pega um feed.
         """
