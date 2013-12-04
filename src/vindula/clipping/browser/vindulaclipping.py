@@ -11,6 +11,7 @@ import urllib2
 from time import time
 
 from plone.memoize import request
+from plone.memoize import ram
 
 from Products.CMFCore.WorkflowCore import WorkflowException
 
@@ -69,6 +70,14 @@ def get_uid_from_entry(entry):
     return sig.hexdigest()
 
 
+def _cache_feeds(method, self, url):
+    feed = feedparser.parse(url)
+    try:
+        return (feed.entries, feed.modified)
+    except AttributeError:
+        return (feed.entries, feed.feed.modified)
+
+
 class VindulaClippingView(grok.View):
     grok.name('importar-rss')
     grok.require("zope2.View")
@@ -107,7 +116,7 @@ class VindulaClippingView(grok.View):
                 entry["published_parsed"]=entry["updated_parsed"]
                 entry["published"]=entry["updated"]
 
-    @request.cache(get_key=lambda func,self:self.get_feeds)
+    @ram.cache(_cache_feeds)
     def get_feed(self, url):
         """ Pega um feed.
         """
@@ -184,160 +193,157 @@ class VindulaClippingView(grok.View):
         folder = self.folder_day()
         for url in urls:
             for entry in self.get_feed(url):
-                entry_dic = {}
-                entry_dic['font'] = self.get_font_title(url)
-                entry_dic['entry'] = entry
-                entries.append(entry_dic)
+                if entry['title'] in titles:
+                    entry_dic = {}
+                    entry_dic['font'] = self.get_font_title(url)
+                    entry_dic['entry'] = entry
+                    entries.append(entry_dic)
 
         for feed in entries:
             font = feed['font']
             entry = feed['entry']
-            if entry['title'] in titles:
-                id = get_uid_from_entry(entry)
-                if not id:
+            id = get_uid_from_entry(entry)
+            if not id:
+                continue
+            updated = entry.get('updated')
+            published = entry.get('published')
+
+            if not updated:
+                # property may be blank if item has never
+                # been updated -- use published date
+                updated = published
+            try:
+                folder.invokeFactory('VindulaNews', id=id, title=entry['title'])
+            except BadRequest:
+                IStatusMessage(self.request).addStatusMessage('A notícia %s já foi importada anteriormente' % entry['title'], type='error')
+                break
+            obj = getattr(folder, id)
+            obj.setCreators(font,)
+            try:
+                self.pw.doActionFor(obj,'publish_internally')
+            except WorkflowException:
+                self.pw.doActionFor(obj,'publish')
+
+            linkDict = getattr(entry, 'link', None)
+            if linkDict:
+                # Hey, that's not a dict at all; at least not in my test.
+                #link = linkDict['href']
+                link = linkDict
+            else:
+                linkDict = getattr(entry, 'links', [{'href': ''}])[0]
+                link = linkDict['href']
+
+            if not updated:
+                updated = DateTime()
+            if published is not None:
+                try:
+                    published = DateTime(published)
+                except DateTime.SyntaxError:
                     continue
-                updated = entry.get('updated')
-                published = entry.get('published')
-
-                if not updated:
-                    # property may be blank if item has never
-                    # been updated -- use published date
-                    updated = published
-                try:
-                    folder.invokeFactory('VindulaNews', id=id, title=entry['title'])
-                except BadRequest:
-                    IStatusMessage(self.request).addStatusMessage('A notícia %s já foi importada anteriormente' % entry['title'], type='error')
-                obj = getattr(folder, id)
-                obj.setCreators(font,)
-                try:
-                    self.pw.doActionFor(obj,'publish_internally')
-                except WorkflowException:
-                    self.pw.doActionFor(obj,'publish')
-
-               
-                linkDict = getattr(entry, 'link', None)
-                if linkDict:
-                    # Hey, that's not a dict at all; at least not in my test.
-                    #link = linkDict['href']
-                    link = linkDict
-                else:
-                    linkDict = getattr(entry, 'links', [{'href': ''}])[0]
-                    link = linkDict['href']
-
-                if not updated:
-                    updated = DateTime()
-                if published is not None:
+                obj.setEffectiveDate(published)
+            summary = getattr(entry, 'summary', '')
+            summary = convert_summary(summary)
+            obj.update(description=summary)
+            feed_tags = [x.get('term') for x in entry.get('tags', [])]
+            obj.feed_tags = feed_tags
+            content = None
+            if hasattr(entry, 'content'):
+                content = entry.content[0]
+                ctype = content.get('type')  # sometimes no type on linux prsr.
+            elif hasattr(entry, 'summary_detail'):
+                # If it is a rss feed with a html description use that
+                # as content.
+                ctype = entry.summary_detail.get('type')
+                if ctype in ('text/xhtml', 'application/xhtml+xml',
+                             'text/html'):
+                    content = entry.summary_detail
+            if content:
+                if ctype in ('text/xhtml', 'application/xhtml+xml'):
+                    # Archetypes doesn't make a difference between
+                    # html and xhtml, so we set the type to text/html:
+                    ctype = 'text/html'
+                    # Warning: minidom.parseString needs a byte
+                    # string, not a unicode one, so we need to
+                    # encode it first, but only for this parsing.
+                    # http://evanjones.ca/python-utf8.html
+                    encoded_content = content['value'].encode('utf-8')
                     try:
-                        published = DateTime(published)
-                    except DateTime.SyntaxError:
-                        continue
-                    obj.setEffectiveDate(published)
-
-                summary = getattr(entry, 'summary', '')
-                summary = convert_summary(summary)
-                obj.update(description=summary)
-                feed_tags = [x.get('term') for x in entry.get('tags', [])]
-                obj.feed_tags = feed_tags
-                content = None
-                if hasattr(entry, 'content'):
-                    content = entry.content[0]
-                    ctype = content.get('type')  # sometimes no type on linux prsr.
-                elif hasattr(entry, 'summary_detail'):
-                    # If it is a rss feed with a html description use that
-                    # as content.
-                    ctype = entry.summary_detail.get('type')
-                    if ctype in ('text/xhtml', 'application/xhtml+xml',
-                                 'text/html'):
-                        content = entry.summary_detail
-                if content:
-                    if ctype in ('text/xhtml', 'application/xhtml+xml'):
-                        # Archetypes doesn't make a difference between
-                        # html and xhtml, so we set the type to text/html:
-                        ctype = 'text/html'
-                        # Warning: minidom.parseString needs a byte
-                        # string, not a unicode one, so we need to
-                        # encode it first, but only for this parsing.
-                        # http://evanjones.ca/python-utf8.html
-                        encoded_content = content['value'].encode('utf-8')
+                        doc = minidom.parseString(encoded_content)
+                    except:
+                        # Might be an ExpatError, but that is
+                        # somewhere in a .so file, so we cannot
+                        # specifically catch only that error.  One
+                        # reason for an ExpatError, is that if there
+                        # is no encapsulated tag, minidom parse fails,
+                        # so we can try again in that case.
+                        encoded_content = "<div>" + encoded_content + "</div>"
                         try:
                             doc = minidom.parseString(encoded_content)
                         except:
-                            # Might be an ExpatError, but that is
-                            # somewhere in a .so file, so we cannot
-                            # specifically catch only that error.  One
-                            # reason for an ExpatError, is that if there
-                            # is no encapsulated tag, minidom parse fails,
-                            # so we can try again in that case.
-                            encoded_content = "<div>" + encoded_content + "</div>"
-                            try:
-                                doc = minidom.parseString(encoded_content)
-                            except:
-                                # Might be that ExpatError again.
-                                continue
-                        if len(doc.childNodes) > 0 and\
-                           doc.firstChild.hasAttributes():
-                            handler = None
-                            top = doc.firstChild
+                            # Might be that ExpatError again.
+                            continue
+                    if len(doc.childNodes) > 0 and\
+                        doc.firstChild.hasAttributes():
+                        handler = None
+                        top = doc.firstChild
 
-                            if handler is None:
-                                update_text(obj, content['value'], mimetype=ctype)
-                            else:
-                                handler.apply(top)
-                                # Grab the first non-<dl> node and treat
-                                # that as the content.
-                                actualContent = None
-                                for node in top.childNodes:
-                                    if node.nodeName == 'div':
-                                        actualContent = node.toxml()
-                                        update_text(obj, actualContent,
-                                            mimetype=ctype)
-                                        break
-                        else:
+                        if handler is None:
                             update_text(obj, content['value'], mimetype=ctype)
+                        else:
+                            handler.apply(top)
+                            # Grab the first non-<dl> node and treat
+                            # that as the content.
+                            actualContent = None
+                            for node in top.childNodes:
+                                if node.nodeName == 'div':
+                                    actualContent = node.toxml()
+                                    update_text(obj, actualContent,
+                                        mimetype=ctype)
+                                    break
                     else:
                         update_text(obj, content['value'], mimetype=ctype)
-                    if summary == convert_summary(content['value']):
-                        # summary and content is the same so we can cut
-                        # the summary.  The transform can stumble over
-                        # unicode, so we convert to a utf-8 string.
-                        summary = summary.encode('utf-8')
-                        data = self.portal_transforms.convert('html_to_text', summary)
-                        summary = data.getData()
-                        words = summary.split()[:72]
-                        summarywords = words[:45]
-                        if len(words) > 70:
-                            # use the first 50-70 words as a description
-                            for word in words[45:]:
-                                summarywords.append(word)
-                                if word.endswith('.'):
-                                    # if we encounter a fullstop that will be the
-                                    # last word appended to the description
-                                    break
-                            summary = ' '.join(summarywords)
-                            if not summary.endswith('.'):
-                                summary = summary + ' ...'
-                        obj.setDescription(summary)
-
-                if hasattr(entry, 'links'):
-                    enclosures = [x for x in entry.links if x.rel == 'enclosure']
-                    real_enclosures = [x for x in enclosures if
-                                       not self.isHTMLEnclosure(x)]
-
-                    for link in real_enclosures:
-                        enclosureSig = md5(link.href)
-                        enclosureId = enclosureSig.hexdigest()
-                        if enclosureId in obj.objectIds():
-                            # Two enclosures with the same href in this
-                            # entry...
-                            continue
-                        enclosure = obj.addEnclosure(enclosureId)
-                        enclosure.update(title=enclosureId)
-                        if enclosure.Title() != enclosure.getId():
-                            self.tryRenamingEnclosure(enclosure, obj)
-                            # At this moment in time, the
-                        # rename-after-creation magic might have changed
-                        # the ID of the file. So we recatalog the object.
-                        obj.reindexObject()
+                else:
+                    update_text(obj, content['value'], mimetype=ctype)
+                if summary == convert_summary(content['value']):
+                    # summary and content is the same so we can cut
+                    # the summary.  The transform can stumble over
+                    # unicode, so we convert to a utf-8 string.
+                    summary = summary.encode('utf-8')
+                    data = self.portal_transforms.convert('html_to_text', summary)
+                    summary = data.getData()
+                    words = summary.split()[:72]
+                    summarywords = words[:45]
+                    if len(words) > 70:
+                        # use the first 50-70 words as a description
+                        for word in words[45:]:
+                            summarywords.append(word)
+                            if word.endswith('.'):
+                                # if we encounter a fullstop that will be the
+                                # last word appended to the description
+                                break
+                        summary = ' '.join(summarywords)
+                        if not summary.endswith('.'):
+                            summary = summary + ' ...'
+                    obj.setDescription(summary)
+            if hasattr(entry, 'links'):
+                enclosures = [x for x in entry.links if x.rel == 'enclosure']
+                real_enclosures = [x for x in enclosures if
+                                   not self.isHTMLEnclosure(x)]
+                for link in real_enclosures:
+                    enclosureSig = md5(link.href)
+                    enclosureId = enclosureSig.hexdigest()
+                    if enclosureId in obj.objectIds():
+                        # Two enclosures with the same href in this
+                        # entry...
+                        continue
+                    enclosure = obj.addEnclosure(enclosureId)
+                    enclosure.update(title=enclosureId)
+                    if enclosure.Title() != enclosure.getId():
+                        self.tryRenamingEnclosure(enclosure, obj)
+                        # At this moment in time, the
+                    # rename-after-creation magic might have changed
+                    # the ID of the file. So we recatalog the object.
+                    obj.reindexObject()
         IStatusMessage(self.request).addStatusMessage('Importacao concluida com sucesso', type='info')
 
     def tryRenamingEnclosure(self, enclosure, feeditem):
